@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MeController;
 use App\Http\Controllers\Api\ServiceController;
+use App\Http\Controllers\Api\ClientController;
+use App\Http\Controllers\Api\AppointmentController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -27,4 +29,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/services/{id}', [ServiceController::class, 'show']);
     Route::put('/services/{id}', [ServiceController::class, 'update']);
     Route::delete('/services/{id}', [ServiceController::class, 'destroy']);
+
+    Route::get('/clients', [ClientController::class, 'index']);
+    Route::post('/clients', [ClientController::class, 'store']);
+    Route::get('/clients/{id}', [ClientController::class, 'show']);
+    Route::put('/clients/{id}', [ClientController::class, 'update']);
+    Route::delete('/clients/{id}', [ClientController::class, 'destroy']);
+
+    Route::get('/appointments', [AppointmentController::class, 'index']);
+    Route::post('/appointments', [AppointmentController::class, 'store']);
+    Route::get('/appointments/{id}', [AppointmentController::class, 'show']);
+    Route::put('/appointments/{id}', [AppointmentController::class, 'update']);
+    Route::delete('/appointments/{id}', [AppointmentController::class, 'destroy']);
+    
 });

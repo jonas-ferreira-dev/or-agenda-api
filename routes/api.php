@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\MeController;
 use App\Http\Controllers\Api\ServiceController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\AppointmentController;
+use App\Http\Controllers\Api\ProfessionalProfileController;
+use App\Http\Controllers\Api\PublicBookingController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -17,12 +19,23 @@ Route::get('/health', function () {
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
+Route::prefix('public')->group(function () {
+    Route::get('/professionals/{slug}', [PublicBookingController::class, 'showProfessional']);
+    Route::get('/professionals/{slug}/services', [PublicBookingController::class, 'services']);
+    Route::get('/professionals/{slug}/availability', [PublicBookingController::class, 'availability']);
+    Route::post('/professionals/{slug}/appointments', [PublicBookingController::class, 'store']);
+});
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::get('/me', [MeController::class, 'show']);
     Route::put('/me', [MeController::class, 'update']);
     Route::put('/me/password', [MeController::class, 'updatePassword']);
+
+    Route::get('/professional-profile', [ProfessionalProfileController::class, 'show']);
+    Route::post('/professional-profile', [ProfessionalProfileController::class, 'store']);
+    Route::put('/professional-profile', [ProfessionalProfileController::class, 'update']);
 
     Route::get('/services', [ServiceController::class, 'index']);
     Route::post('/services', [ServiceController::class, 'store']);
@@ -41,5 +54,4 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/appointments/{id}', [AppointmentController::class, 'show']);
     Route::put('/appointments/{id}', [AppointmentController::class, 'update']);
     Route::delete('/appointments/{id}', [AppointmentController::class, 'destroy']);
-    
 });

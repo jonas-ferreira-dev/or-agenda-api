@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\ProfessionalProfile;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class User extends Authenticatable
 {
@@ -40,4 +42,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(Client::class);
     }
+
+    public function professionalProfile(): HasOne
+    {
+        return $this->hasOne(ProfessionalProfile::class);
+    }
+
 }

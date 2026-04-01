@@ -26,3 +26,4 @@ class AppointmentFactory extends Factory
         ];
     }
 }
+

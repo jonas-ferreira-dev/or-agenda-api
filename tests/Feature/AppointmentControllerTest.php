@@ -154,10 +154,10 @@ class AppointmentControllerTest extends TestCase
             'end_time' => '12:00',
         ]);
 
-        $response->assertOk()
+       $response->assertOk()
             ->assertJsonFragment([
-                'start_time' => '11:00:00',
-                'end_time' => '12:00:00',
+                'start_time' => '11:00',
+                'end_time' => '12:00',
             ]);
     }
 

@@ -13,11 +13,22 @@ class ClientController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $perPage = min((int) $request->get('per_page', 15), 100);
+
         $clients = Client::where('user_id', $request->user()->id)
             ->latest()
-            ->get();
+            ->paginate($perPage);
 
-        return response()->json($clients);
+        return response()->json([
+            'message' => 'Clientes listados com sucesso.',
+            'data' => $clients->items(),
+            'meta' => [
+                'current_page' => $clients->currentPage(),
+                'last_page' => $clients->lastPage(),
+                'per_page' => $clients->perPage(),
+                'total' => $clients->total(),
+            ],
+        ]);
     }
 
     public function store(StoreClientRequest $request): JsonResponse
@@ -30,14 +41,20 @@ class ClientController extends Controller
             'notes' => $request->notes,
         ]);
 
-        return response()->json($client, 201);
+        return response()->json([
+            'message' => 'Cliente criado com sucesso.',
+            'data' => $client,
+        ], 201);
     }
 
     public function show(Request $request, int $id): JsonResponse
     {
         $client = Client::where('user_id', $request->user()->id)->findOrFail($id);
 
-        return response()->json($client);
+        return response()->json([
+            'message' => 'Cliente encontrado com sucesso.',
+            'data' => $client,
+        ]);
     }
 
     public function update(UpdateClientRequest $request, int $id): JsonResponse
@@ -51,7 +68,10 @@ class ClientController extends Controller
             'notes',
         ]));
 
-        return response()->json($client);
+        return response()->json([
+            'message' => 'Cliente atualizado com sucesso.',
+            'data' => $client->fresh(),
+        ]);
     }
 
     public function destroy(Request $request, int $id): JsonResponse

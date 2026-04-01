@@ -11,15 +11,26 @@ use Illuminate\Http\Request;
 
 class ServiceController extends Controller
 {
+    
+
     public function index(Request $request): JsonResponse
     {
+        $perPage = min((int) $request->get('per_page', 15), 100);
+
         $services = $request->user()
             ->services()
             ->latest()
-            ->get();
+            ->paginate($perPage);
 
         return response()->json([
-            'data' => $services,
+            'message' => 'Serviços listados com sucesso.',
+            'data' => $services->items(),
+            'meta' => [
+                'current_page' => $services->currentPage(),
+                'last_page' => $services->lastPage(),
+                'per_page' => $services->perPage(),
+                'total' => $services->total(),
+            ],
         ]);
     }
 

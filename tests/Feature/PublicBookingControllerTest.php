@@ -69,6 +69,7 @@ class PublicBookingControllerTest extends TestCase
 
         $service = Service::factory()->create([
             'user_id' => $user->id,
+            'duration_minutes' => 60,
         ]);
 
         $response = $this->postJson('/api/public/professionals/joao-barber/appointments', [
@@ -105,8 +106,8 @@ class PublicBookingControllerTest extends TestCase
             'client_id' => $client->id,
             'service_id' => $service->id,
             'appointment_date' => '2026-04-10',
-            'start_time' => '10:00',
-            'end_time' => '11:00',
+            'start_time' => '10:00:00',
+            'end_time' => '11:00:00',
         ]);
     }
 
@@ -122,6 +123,7 @@ class PublicBookingControllerTest extends TestCase
 
         $service = Service::factory()->create([
             'user_id' => $user->id,
+            'duration_minutes' => 60,
         ]);
 
         $client = Client::factory()->create([
@@ -150,8 +152,8 @@ class PublicBookingControllerTest extends TestCase
             'client_id' => $client->id,
             'service_id' => $service->id,
             'appointment_date' => '2026-04-10',
-            'start_time' => '12:00',
-            'end_time' => '13:00',
+            'start_time' => '12:00:00',
+            'end_time' => '13:00:00',
         ]);
     }
 

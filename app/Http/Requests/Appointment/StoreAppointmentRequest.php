@@ -18,7 +18,6 @@ class StoreAppointmentRequest extends FormRequest
             'service_id' => ['required', 'integer', 'exists:services,id'],
             'appointment_date' => ['required', 'date'],
             'start_time' => ['required', 'date_format:H:i'],
-            'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
             'status' => ['nullable', 'in:scheduled,completed,cancelled'],
             'notes' => ['nullable', 'string'],
         ];

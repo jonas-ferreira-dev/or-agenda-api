@@ -18,7 +18,6 @@ class UpdateAppointmentRequest extends FormRequest
             'service_id' => ['sometimes', 'required', 'integer', 'exists:services,id'],
             'appointment_date' => ['sometimes', 'required', 'date'],
             'start_time' => ['sometimes', 'required', 'date_format:H:i'],
-            'end_time' => ['sometimes', 'required', 'date_format:H:i'],
             'status' => ['nullable', 'in:scheduled,completed,cancelled'],
             'notes' => ['nullable', 'string'],
         ];

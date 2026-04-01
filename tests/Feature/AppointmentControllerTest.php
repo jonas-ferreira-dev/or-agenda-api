@@ -14,11 +14,16 @@ class AppointmentControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+
+
     public function test_authenticated_user_can_create_appointment(): void
     {
         $user = User::factory()->create();
         $client = Client::factory()->create(['user_id' => $user->id]);
-        $service = Service::factory()->create(['user_id' => $user->id]);
+        $service = Service::factory()->create([
+            'user_id' => $user->id,
+            'duration_minutes' => 60,
+        ]);
 
         Sanctum::actingAs($user);
 
@@ -27,19 +32,21 @@ class AppointmentControllerTest extends TestCase
             'service_id' => $service->id,
             'appointment_date' => '2025-09-10',
             'start_time' => '10:00',
-            'end_time' => '11:00',
             'notes' => 'Primeiro atendimento',
         ]);
 
-        $response->assertCreated();
+        $response->assertCreated()
+            ->assertJsonPath('message', 'Agendamento criado com sucesso.')
+            ->assertJsonPath('data.start_time', '10:00')
+            ->assertJsonPath('data.end_time', '11:00:00');
 
         $this->assertDatabaseHas('appointments', [
             'user_id' => $user->id,
             'client_id' => $client->id,
             'service_id' => $service->id,
             'appointment_date' => '2025-09-10',
-            'start_time' => '10:00',
-            'end_time' => '11:00',
+            'start_time' => '10:00:00',
+            'end_time' => '11:00:00',
         ]);
     }
 
@@ -116,6 +123,7 @@ class AppointmentControllerTest extends TestCase
             ]);
     }
 
+
     public function test_user_lists_only_own_appointments(): void
     {
         $user = User::factory()->create();
@@ -129,36 +137,44 @@ class AppointmentControllerTest extends TestCase
         $response = $this->getJson('/api/appointments');
 
         $response->assertOk()
-            ->assertJsonCount(1);
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonCount(1, 'data');
     }
 
     public function test_user_can_update_own_appointment(): void
     {
         $user = User::factory()->create();
         $client = Client::factory()->create(['user_id' => $user->id]);
-        $service = Service::factory()->create(['user_id' => $user->id]);
+        $service = Service::factory()->create([
+            'user_id' => $user->id,
+            'duration_minutes' => 60,
+        ]);
 
         $appointment = Appointment::factory()->create([
             'user_id' => $user->id,
             'client_id' => $client->id,
             'service_id' => $service->id,
             'appointment_date' => '2025-09-10',
-            'start_time' => '10:00',
-            'end_time' => '11:00',
+            'start_time' => '10:00:00',
+            'end_time' => '11:00:00',
         ]);
 
         Sanctum::actingAs($user);
 
         $response = $this->putJson("/api/appointments/{$appointment->id}", [
             'start_time' => '11:00',
-            'end_time' => '12:00',
         ]);
 
-       $response->assertOk()
-            ->assertJsonFragment([
-                'start_time' => '11:00',
-                'end_time' => '12:00',
-            ]);
+        $response->assertOk()
+            ->assertJsonPath('message', 'Agendamento atualizado com sucesso.')
+            ->assertJsonPath('data.start_time', '11:00')
+            ->assertJsonPath('data.end_time', '12:00:00');
+
+        $this->assertDatabaseHas('appointments', [
+            'id' => $appointment->id,
+            'start_time' => '11:00:00',
+            'end_time' => '12:00:00',
+        ]);
     }
 
     public function test_user_can_delete_own_appointment(): void

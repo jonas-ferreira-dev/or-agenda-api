@@ -8,6 +8,7 @@ use App\Http\Requests\Appointment\UpdateAppointmentRequest;
 use App\Models\Appointment;
 use App\Models\Client;
 use App\Models\Service;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,13 +16,24 @@ class AppointmentController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $perPage = min((int) $request->get('per_page', 15), 100);
+
         $appointments = Appointment::where('user_id', $request->user()->id)
             ->with(['client', 'service'])
-            ->orderBy('appointment_date')
-            ->orderBy('start_time')
-            ->get();
+            ->orderByDesc('appointment_date')
+            ->orderByDesc('start_time')
+            ->paginate($perPage);
 
-        return response()->json($appointments);
+        return response()->json([
+            'message' => 'Agendamentos listados com sucesso.',
+            'data' => $appointments->items(),
+            'meta' => [
+                'current_page' => $appointments->currentPage(),
+                'last_page' => $appointments->lastPage(),
+                'per_page' => $appointments->perPage(),
+                'total' => $appointments->total(),
+            ],
+        ]);
     }
 
     public function store(StoreAppointmentRequest $request): JsonResponse
@@ -31,11 +43,13 @@ class AppointmentController extends Controller
         $client = Client::where('user_id', $user->id)->findOrFail($request->client_id);
         $service = Service::where('user_id', $user->id)->findOrFail($request->service_id);
 
+        $endTime = $this->calculateEndTime($request->start_time, $service->duration_minutes);
+
         $hasConflict = Appointment::where('user_id', $user->id)
             ->whereDate('appointment_date', $request->appointment_date)
-            ->where(function ($query) use ($request) {
-                $query->where('start_time', '<', $request->end_time)
-                      ->where('end_time', '>', $request->start_time);
+            ->where(function ($query) use ($request, $endTime) {
+                $query->where('start_time', '<', $endTime)
+                    ->where('end_time', '>', $request->start_time);
             })
             ->exists();
 
@@ -51,15 +65,15 @@ class AppointmentController extends Controller
             'service_id' => $service->id,
             'appointment_date' => $request->appointment_date,
             'start_time' => $request->start_time,
-            'end_time' => $request->end_time,
+            'end_time' => $endTime,
             'status' => $request->status ?? 'scheduled',
             'notes' => $request->notes,
-        ]);
+        ])->load(['client', 'service']);
 
-        return response()->json(
-            $appointment->load(['client', 'service']),
-            201
-        );
+        return response()->json([
+            'message' => 'Agendamento criado com sucesso.',
+            'data' => $appointment,
+        ], 201);
     }
 
     public function show(Request $request, int $id): JsonResponse
@@ -68,7 +82,10 @@ class AppointmentController extends Controller
             ->with(['client', 'service'])
             ->findOrFail($id);
 
-        return response()->json($appointment);
+        return response()->json([
+            'message' => 'Agendamento encontrado com sucesso.',
+            'data' => $appointment,
+        ]);
     }
 
     public function update(UpdateAppointmentRequest $request, int $id): JsonResponse
@@ -81,29 +98,20 @@ class AppointmentController extends Controller
             Client::where('user_id', $user->id)->findOrFail($request->client_id);
         }
 
-        if ($request->filled('service_id')) {
-            Service::where('user_id', $user->id)->findOrFail($request->service_id);
-        }
+        $service = $request->filled('service_id')
+            ? Service::where('user_id', $user->id)->findOrFail($request->service_id)
+            : Service::where('user_id', $user->id)->findOrFail($appointment->service_id);
 
         $appointmentDate = $request->appointment_date ?? $appointment->appointment_date->format('Y-m-d');
         $startTime = $request->start_time ?? $appointment->start_time;
-        $endTime = $request->end_time ?? $appointment->end_time;
-
-        if ($endTime <= $startTime) {
-            return response()->json([
-                'message' => 'O horário final deve ser maior que o horário inicial.',
-                'errors' => [
-                    'end_time' => ['O horário final deve ser maior que o horário inicial.'],
-                ],
-            ], 422);
-        }
+        $endTime = $this->calculateEndTime($startTime, $service->duration_minutes);
 
         $hasConflict = Appointment::where('user_id', $user->id)
             ->whereDate('appointment_date', $appointmentDate)
             ->where('id', '!=', $appointment->id)
             ->where(function ($query) use ($startTime, $endTime) {
                 $query->where('start_time', '<', $endTime)
-                      ->where('end_time', '>', $startTime);
+                    ->where('end_time', '>', $startTime);
             })
             ->exists();
 
@@ -115,7 +123,7 @@ class AppointmentController extends Controller
 
         $appointment->update([
             'client_id' => $request->client_id ?? $appointment->client_id,
-            'service_id' => $request->service_id ?? $appointment->service_id,
+            'service_id' => $service->id,
             'appointment_date' => $appointmentDate,
             'start_time' => $startTime,
             'end_time' => $endTime,
@@ -123,7 +131,10 @@ class AppointmentController extends Controller
             'notes' => $request->notes ?? $appointment->notes,
         ]);
 
-        return response()->json($appointment->load(['client', 'service']));
+        return response()->json([
+            'message' => 'Agendamento atualizado com sucesso.',
+            'data' => $appointment->load(['client', 'service']),
+        ]);
     }
 
     public function destroy(Request $request, int $id): JsonResponse
@@ -135,5 +146,12 @@ class AppointmentController extends Controller
         return response()->json([
             'message' => 'Agendamento removido com sucesso.',
         ]);
+    }
+
+    private function calculateEndTime(string $startTime, int $durationMinutes): string
+    {
+        return Carbon::createFromFormat('H:i', $startTime)
+            ->addMinutes($durationMinutes)
+            ->format('H:i:s');
     }
 }

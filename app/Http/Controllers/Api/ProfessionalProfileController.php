@@ -15,13 +15,16 @@ class ProfessionalProfileController extends Controller
     {
         $profile = ProfessionalProfile::where('user_id', $request->user()->id)->first();
 
-        if (!$profile) {
+        if (! $profile) {
             return response()->json([
                 'message' => 'Perfil profissional ainda não cadastrado.',
             ], 404);
         }
 
-        return response()->json($profile);
+        return response()->json([
+            'message' => 'Perfil profissional encontrado com sucesso.',
+            'data' => $profile,
+        ]);
     }
 
     public function store(StoreProfessionalProfileRequest $request): JsonResponse
@@ -44,7 +47,10 @@ class ProfessionalProfileController extends Controller
             'booking_enabled' => $request->boolean('booking_enabled', true),
         ]);
 
-        return response()->json($profile, 201);
+        return response()->json([
+            'message' => 'Perfil profissional criado com sucesso.',
+            'data' => $profile,
+        ], 201);
     }
 
     public function update(UpdateProfessionalProfileRequest $request): JsonResponse
@@ -60,6 +66,9 @@ class ProfessionalProfileController extends Controller
             'booking_enabled',
         ]));
 
-        return response()->json($profile);
+        return response()->json([
+            'message' => 'Perfil profissional atualizado com sucesso.',
+            'data' => $profile->fresh(),
+        ]);
     }
 }

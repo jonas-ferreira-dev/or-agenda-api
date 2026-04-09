@@ -15,10 +15,17 @@ class StoreProfessionalProfileRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'slug' => ['required', 'string', 'max:255', 'alpha_dash', 'unique:professional_profiles,slug'],
-            'public_name' => ['nullable', 'string', 'max:255'],
+            'slug' => [
+                'required',
+                'string',
+                'max:255',
+                'regex:/^[a-z0-9-]+$/',
+                Rule::unique('professional_profiles', 'slug'),
+            ],
+            'public_name' => ['required', 'string', 'max:255'],
             'bio' => ['nullable', 'string'],
-            'profile_photo' => ['nullable', 'string', 'max:255'],
+            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'remove_profile_photo' => ['nullable', 'boolean'],
             'is_public' => ['nullable', 'boolean'],
             'booking_enabled' => ['nullable', 'boolean'],
         ];

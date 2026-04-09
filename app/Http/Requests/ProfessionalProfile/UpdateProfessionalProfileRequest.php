@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\ProfessionalProfile;
 
+use App\Models\ProfessionalProfile;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -14,20 +15,20 @@ class UpdateProfessionalProfileRequest extends FormRequest
 
     public function rules(): array
     {
-        $profileId = $this->route('id');
+        $profileId = ProfessionalProfile::where('user_id', $this->user()->id)->value('id');
 
         return [
             'slug' => [
-                'sometimes',
                 'required',
                 'string',
                 'max:255',
-                'alpha_dash',
+                'regex:/^[a-z0-9-]+$/',
                 Rule::unique('professional_profiles', 'slug')->ignore($profileId),
             ],
-            'public_name' => ['nullable', 'string', 'max:255'],
+            'public_name' => ['required', 'string', 'max:255'],
             'bio' => ['nullable', 'string'],
-            'profile_photo' => ['nullable', 'string', 'max:255'],
+            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'remove_profile_photo' => ['nullable', 'boolean'],
             'is_public' => ['nullable', 'boolean'],
             'booking_enabled' => ['nullable', 'boolean'],
         ];

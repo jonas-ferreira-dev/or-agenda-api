@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class ProfessionalProfile extends Model
 {
-     use HasFactory;
+    use HasFactory;
 
     protected $fillable = [
         'user_id',
@@ -25,8 +25,21 @@ class ProfessionalProfile extends Model
         'booking_enabled' => 'boolean',
     ];
 
+    protected $appends = [
+        'profile_photo_url',
+    ];
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        if (! $this->profile_photo) {
+            return null;
+        }
+
+        return asset('storage/' . $this->profile_photo);
     }
 }

@@ -540,61 +540,11 @@ tests/
 
 ---
 
-## 📈 Possíveis evoluções do projeto
-
-- painel administrativo completo
-- dashboard com métricas de atendimentos
-- bloqueio de horários indisponíveis
-- configuração de jornada de trabalho por profissional
-- intervalos personalizados
-- integração com WhatsApp
-- envio automático de lembretes
-- confirmação e cancelamento por link
-- multiempresa / multiunidade
-- documentação OpenAPI/Swagger
-
----
-
-## 🤝 Contribuição
-
-Contribuições são bem-vindas.
-
-Se quiser evoluir este projeto, você pode:
-
-1. fazer um fork
-2. criar uma branch com sua feature
-3. commitar suas alterações
-4. abrir um pull request
-
----
-
-## 📄 Licença
-
-Este projeto pode ser distribuído sob a licença definida pelo autor.
-
-Se quiser deixar explícito no GitHub, você pode adicionar uma licença como:
-- MIT
-- Apache 2.0
-- GPL
-
----
-
 ## 👨‍💻 Autor
 
 **Jonas Ferreira**
 
 Projeto desenvolvido para compor a suíte de soluções da **OR Digital**, com foco em organização de agenda, automação de rotina e experiência de atendimento para profissionais autônomos.
 
----
 
-## 💡 Observação final
-
-Se você quiser, este README pode evoluir facilmente para incluir também:
-
-- link da aplicação frontend
-- coleção do Postman
-- documentação Swagger
-- exemplos reais de respostas da API
-- instruções com Docker
-- variáveis de ambiente completas
 

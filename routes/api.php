@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\ProfessionalProfileController;
 use App\Http\Controllers\Api\PublicBookingController;
+use App\Http\Controllers\Api\DashboardController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -32,6 +33,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [MeController::class, 'show']);
     Route::put('/me', [MeController::class, 'update']);
     Route::put('/me/password', [MeController::class, 'updatePassword']);
+    Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
 
     Route::get('/professional-profile', [ProfessionalProfileController::class, 'show']);
     Route::post('/professional-profile', [ProfessionalProfileController::class, 'store']);

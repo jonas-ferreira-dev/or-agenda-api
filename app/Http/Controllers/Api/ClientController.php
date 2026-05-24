@@ -11,11 +11,25 @@ use Illuminate\Http\Request;
 
 class ClientController extends Controller
 {
-    public function index(Request $request): JsonResponse
+     public function index(Request $request): JsonResponse
     {
-        $perPage = min((int) $request->get('per_page', 15), 100);
+        $validated = $request->validate([
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'search' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $perPage = $validated['per_page'] ?? 15;
 
         $clients = Client::where('user_id', $request->user()->id)
+            ->when(! empty($validated['search']), function ($query) use ($validated) {
+                $search = $validated['search'];
+
+                $query->where(function ($query) use ($search) {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%");
+                });
+            })
             ->latest()
             ->paginate($perPage);
 
@@ -27,6 +41,8 @@ class ClientController extends Controller
                 'last_page' => $clients->lastPage(),
                 'per_page' => $clients->perPage(),
                 'total' => $clients->total(),
+                'from' => $clients->firstItem(),
+                'to' => $clients->lastItem(),
             ],
         ]);
     }

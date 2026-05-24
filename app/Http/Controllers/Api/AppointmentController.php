@@ -14,12 +14,39 @@ use Illuminate\Http\Request;
 
 class AppointmentController extends Controller
 {
-    public function index(Request $request): JsonResponse
+        public function index(Request $request): JsonResponse
     {
-        $perPage = min((int) $request->get('per_page', 15), 100);
+        $validated = $request->validate([
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'date' => ['nullable', 'date'],
+            'status' => ['nullable', 'in:scheduled,confirmed,completed,cancelled'],
+            'search' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $perPage = $validated['per_page'] ?? 15;
 
         $appointments = Appointment::where('user_id', $request->user()->id)
             ->with(['client', 'service'])
+            ->when(! empty($validated['date']), function ($query) use ($validated) {
+                $query->whereDate('appointment_date', $validated['date']);
+            })
+            ->when(! empty($validated['status']), function ($query) use ($validated) {
+                $query->where('status', $validated['status']);
+            })
+            ->when(! empty($validated['search']), function ($query) use ($validated) {
+                $search = $validated['search'];
+
+                $query->where(function ($query) use ($search) {
+                    $query->whereHas('client', function ($clientQuery) use ($search) {
+                        $clientQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('service', function ($serviceQuery) use ($search) {
+                        $serviceQuery->where('name', 'like', "%{$search}%");
+                    });
+                });
+            })
             ->orderByDesc('appointment_date')
             ->orderByDesc('start_time')
             ->paginate($perPage);
@@ -32,6 +59,8 @@ class AppointmentController extends Controller
                 'last_page' => $appointments->lastPage(),
                 'per_page' => $appointments->perPage(),
                 'total' => $appointments->total(),
+                'from' => $appointments->firstItem(),
+                'to' => $appointments->lastItem(),
             ],
         ]);
     }
@@ -46,10 +75,11 @@ class AppointmentController extends Controller
         $endTime = $this->calculateEndTime($request->start_time, $service->duration_minutes);
 
         $hasConflict = Appointment::where('user_id', $user->id)
-            ->whereDate('appointment_date', $request->appointment_date)
-            ->where(function ($query) use ($request, $endTime) {
-                $query->where('start_time', '<', $endTime)
-                    ->where('end_time', '>', $request->start_time);
+                ->whereDate('appointment_date', $request->appointment_date)
+                ->whereNotIn('status', ['cancelled'])
+                ->where(function ($query) use ($request, $endTime) {
+                    $query->where('start_time', '<', $endTime)
+                        ->where('end_time', '>', $request->start_time);
             })
             ->exists();
 
@@ -109,6 +139,7 @@ class AppointmentController extends Controller
         $hasConflict = Appointment::where('user_id', $user->id)
             ->whereDate('appointment_date', $appointmentDate)
             ->where('id', '!=', $appointment->id)
+            ->whereNotIn('status', ['cancelled'])
             ->where(function ($query) use ($startTime, $endTime) {
                 $query->where('start_time', '<', $endTime)
                     ->where('end_time', '>', $startTime);

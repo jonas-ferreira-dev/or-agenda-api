@@ -17,22 +17,44 @@ Route::get('/health', function () {
     ]);
 });
 
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register'])
+    ->middleware('throttle:5,1');
 
+Route::post('/login', [AuthController::class, 'login'])
+    ->middleware('throttle:5,1');
+
+/*
+|--------------------------------------------------------------------------
+| Rotas públicas
+|--------------------------------------------------------------------------
+| Essas rotas NÃO podem ficar dentro do auth:sanctum.
+*/
 Route::prefix('public')->group(function () {
-    Route::get('/professionals/{slug}', [PublicBookingController::class, 'showProfessional']);
-    Route::get('/professionals/{slug}/services', [PublicBookingController::class, 'services']);
-    Route::get('/professionals/{slug}/availability', [PublicBookingController::class, 'availability']);
-    Route::post('/professionals/{slug}/appointments', [PublicBookingController::class, 'store']);
+    Route::get('/professionals/{slug}', [PublicBookingController::class, 'showProfessional'])
+        ->middleware('throttle:60,1');
+
+    Route::get('/professionals/{slug}/services', [PublicBookingController::class, 'services'])
+        ->middleware('throttle:60,1');
+
+    Route::get('/professionals/{slug}/availability', [PublicBookingController::class, 'availability'])
+        ->middleware('throttle:60,1');
+
+    Route::post('/professionals/{slug}/appointments', [PublicBookingController::class, 'store'])
+        ->middleware('throttle:10,1');
 });
 
+/*
+|--------------------------------------------------------------------------
+| Rotas privadas
+|--------------------------------------------------------------------------
+*/
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::get('/me', [MeController::class, 'show']);
     Route::put('/me', [MeController::class, 'update']);
     Route::put('/me/password', [MeController::class, 'updatePassword']);
+
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
 
     Route::get('/professional-profile', [ProfessionalProfileController::class, 'show']);

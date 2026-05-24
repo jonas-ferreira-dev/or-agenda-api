@@ -13,12 +13,29 @@ class ServiceController extends Controller
 {
     
 
-    public function index(Request $request): JsonResponse
+     public function index(Request $request): JsonResponse
     {
-        $perPage = min((int) $request->get('per_page', 15), 100);
+        $validated = $request->validate([
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'search' => ['nullable', 'string', 'max:100'],
+            'active' => ['nullable', 'boolean'],
+        ]);
+
+        $perPage = $validated['per_page'] ?? 15;
 
         $services = $request->user()
             ->services()
+            ->when(! empty($validated['search']), function ($query) use ($validated) {
+                $search = $validated['search'];
+
+                $query->where(function ($query) use ($search) {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
+                });
+            })
+            ->when(array_key_exists('active', $validated), function ($query) use ($validated) {
+                $query->where('active', $validated['active']);
+            })
             ->latest()
             ->paginate($perPage);
 
@@ -30,6 +47,8 @@ class ServiceController extends Controller
                 'last_page' => $services->lastPage(),
                 'per_page' => $services->perPage(),
                 'total' => $services->total(),
+                'from' => $services->firstItem(),
+                'to' => $services->lastItem(),
             ],
         ]);
     }

@@ -16,7 +16,7 @@ class PublicBookingController extends Controller
 {
     public function showProfessional(string $slug): JsonResponse
     {
-        $profile = ProfessionalProfile::with('user')
+        $profile = ProfessionalProfile::with('user:id,name')
             ->where('slug', $slug)
             ->where('is_public', true)
             ->firstOrFail();
@@ -28,22 +28,25 @@ class PublicBookingController extends Controller
                 'public_name' => $profile->public_name ?? $profile->user->name,
                 'bio' => $profile->bio,
                 'profile_photo' => $profile->profile_photo,
-                'booking_enabled' => $profile->booking_enabled,
+                'booking_enabled' => (bool) $profile->booking_enabled,
             ],
         ]);
     }
 
     public function services(string $slug): JsonResponse
     {
-        $profile = ProfessionalProfile::where('slug', $slug)
-            ->where('is_public', true)
-            ->where('booking_enabled', true)
-            ->firstOrFail();
+        $profile = $this->findBookableProfile($slug);
 
         $services = Service::where('user_id', $profile->user_id)
             ->where('active', true)
-            ->latest()
-            ->get();
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+                'duration_minutes',
+                'price',
+                'description',
+            ]);
 
         return response()->json([
             'message' => 'Serviços públicos listados com sucesso.',
@@ -53,22 +56,20 @@ class PublicBookingController extends Controller
 
     public function availability(Request $request, string $slug): JsonResponse
     {
-        $request->validate([
-            'date' => ['required', 'date'],
-            'service_id' => ['required', 'integer', 'exists:services,id'],
+        $validated = $request->validate([
+            'date' => ['required', 'date', 'after_or_equal:today'],
+            'service_id' => ['required', 'integer'],
         ]);
 
-        $profile = ProfessionalProfile::where('slug', $slug)
-            ->where('is_public', true)
-            ->where('booking_enabled', true)
-            ->firstOrFail();
+        $profile = $this->findBookableProfile($slug);
 
         $service = Service::where('user_id', $profile->user_id)
             ->where('active', true)
-            ->findOrFail($request->service_id);
+            ->findOrFail($validated['service_id']);
 
         $busyAppointments = Appointment::where('user_id', $profile->user_id)
-            ->whereDate('appointment_date', $request->date)
+            ->whereDate('appointment_date', $validated['date'])
+            ->whereNotIn('status', ['cancelled'])
             ->orderBy('start_time')
             ->get(['start_time', 'end_time']);
 
@@ -83,59 +84,32 @@ class PublicBookingController extends Controller
         return response()->json([
             'message' => 'Disponibilidade carregada com sucesso.',
             'data' => [
-                'date' => $request->date,
+                'date' => $validated['date'],
                 'service_id' => $service->id,
                 'duration_minutes' => $service->duration_minutes,
                 'available_slots' => $availableSlots,
-                'busy_slots' => $busyAppointments,
             ],
         ]);
     }
 
     public function store(StorePublicAppointmentRequest $request, string $slug): JsonResponse
     {
-        $profile = ProfessionalProfile::where('slug', $slug)
-            ->where('is_public', true)
-            ->where('booking_enabled', true)
-            ->firstOrFail();
+        $validated = $request->validated();
+
+        $profile = $this->findBookableProfile($slug);
 
         $service = Service::where('user_id', $profile->user_id)
             ->where('active', true)
-            ->findOrFail($request->service_id);
+            ->findOrFail($validated['service_id']);
 
-        $client = Client::where('user_id', $profile->user_id)
-            ->where('phone', $request->phone)
-            ->first();
-
-        if (! $client && $request->filled('email')) {
-            $client = Client::where('user_id', $profile->user_id)
-                ->where('email', $request->email)
-                ->first();
-        }
-
-        if ($client) {
-            $client->update([
-                'name' => $request->name,
-                'email' => $request->email ?? $client->email,
-                'phone' => $request->phone,
-            ]);
-        } else {
-            $client = Client::create([
-                'user_id' => $profile->user_id,
-                'name' => $request->name,
-                'email' => $request->email,
-                'phone' => $request->phone,
-                'notes' => null,
-            ]);
-        }
-
-        $endTime = $this->calculateEndTime($request->start_time, $service->duration_minutes);
+        $endTime = $this->calculateEndTime($validated['start_time'], $service->duration_minutes);
 
         $hasConflict = Appointment::where('user_id', $profile->user_id)
-            ->whereDate('appointment_date', $request->appointment_date)
-            ->where(function ($query) use ($request, $endTime) {
+            ->whereDate('appointment_date', $validated['appointment_date'])
+            ->whereNotIn('status', ['cancelled'])
+            ->where(function ($query) use ($validated, $endTime) {
                 $query->where('start_time', '<', $endTime)
-                    ->where('end_time', '>', $request->start_time);
+                    ->where('end_time', '>', $validated['start_time']);
             })
             ->exists();
 
@@ -145,21 +119,78 @@ class PublicBookingController extends Controller
             ], 422);
         }
 
+        $client = $this->findOrCreatePublicClient($profile->user_id, $validated);
+
         $appointment = Appointment::create([
             'user_id' => $profile->user_id,
             'client_id' => $client->id,
             'service_id' => $service->id,
-            'appointment_date' => $request->appointment_date,
-            'start_time' => $request->start_time,
+            'appointment_date' => $validated['appointment_date'],
+            'start_time' => $validated['start_time'],
             'end_time' => $endTime,
             'status' => 'scheduled',
-            'notes' => $request->notes,
-        ])->load(['client', 'service']);
+            'notes' => $validated['notes'] ?? null,
+        ]);
 
         return response()->json([
             'message' => 'Agendamento público criado com sucesso.',
-            'data' => $appointment,
+            'data' => [
+                'id' => $appointment->id,
+                'appointment_date' => $appointment->appointment_date,
+                'start_time' => $appointment->start_time,
+                'end_time' => $appointment->end_time,
+                'status' => $appointment->status,
+                'service' => [
+                    'id' => $service->id,
+                    'name' => $service->name,
+                    'duration_minutes' => $service->duration_minutes,
+                    'price' => $service->price,
+                ],
+                'client' => [
+                    'name' => $client->name,
+                    'phone' => $client->phone,
+                ],
+            ],
         ], 201);
+    }
+
+    private function findBookableProfile(string $slug): ProfessionalProfile
+    {
+        return ProfessionalProfile::where('slug', $slug)
+            ->where('is_public', true)
+            ->where('booking_enabled', true)
+            ->firstOrFail();
+    }
+
+    private function findOrCreatePublicClient(int $userId, array $validated): Client
+    {
+        $client = Client::where('user_id', $userId)
+            ->where('phone', $validated['phone'])
+            ->first();
+
+        if (! $client && ! empty($validated['email'])) {
+            $client = Client::where('user_id', $userId)
+                ->where('email', $validated['email'])
+                ->first();
+        }
+
+        if ($client) {
+            $client->update([
+                'name' => $validated['name'],
+                'email' => $validated['email'] ?? $client->email,
+                'phone' => $validated['phone'],
+            ]);
+
+            return $client->fresh();
+        }
+
+        return Client::create([
+            'user_id' => $userId,
+            'name' => $validated['name'],
+            'email' => $validated['email'] ?? null,
+            'phone' => $validated['phone'],
+            'notes' => null,
+        ]);
     }
 
     private function calculateEndTime(string $startTime, int $durationMinutes): string

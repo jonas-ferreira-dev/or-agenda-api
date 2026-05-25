@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ProfessionalProfileController;
 use App\Http\Controllers\Api\PublicBookingController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\PlatformUserController;
+use App\Http\Controllers\Api\ReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -54,6 +55,8 @@ Route::middleware('auth:sanctum')->group(function () {
          Route::post('/platform/users', [PlatformUserController::class, 'store']);
          Route::put('/platform/users/{user}', [PlatformUserController::class, 'update']);
     });
+
+
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::get('/me', [MeController::class, 'show']);
@@ -83,4 +86,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/appointments/{id}', [AppointmentController::class, 'show']);
     Route::put('/appointments/{id}', [AppointmentController::class, 'update']);
     Route::delete('/appointments/{id}', [AppointmentController::class, 'destroy']);
+
+    Route::prefix('reports')->group(function () {
+        Route::get('/revenue', [ReportController::class, 'revenue']);
+        Route::get('/appointments', [ReportController::class, 'appointments']);
+        Route::get('/cancellations', [ReportController::class, 'cancellations']);
+        Route::get('/clients', [ReportController::class, 'clients']);
+    });
+
 });

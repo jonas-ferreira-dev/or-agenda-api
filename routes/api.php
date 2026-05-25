@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\PlatformUserController;
 use App\Http\Controllers\Api\ReportController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\ProfessionalAvailabilityController;
 
 Route::get('/health', function () {
     return response()->json([
@@ -58,6 +59,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    Route::apiResource(
+        '/professional-availabilities',
+        ProfessionalAvailabilityController::class
+    )->only(['index', 'store', 'update', 'destroy']);
 
     Route::get('/me', [MeController::class, 'show']);
     Route::put('/me', [MeController::class, 'update']);

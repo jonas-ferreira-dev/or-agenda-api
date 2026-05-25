@@ -52,4 +52,9 @@ class User extends Authenticatable
         return $this->hasOne(ProfessionalProfile::class);
     }
 
+    public function professionalAvailabilities()
+    {
+        return $this->hasMany(ProfessionalAvailability::class);
+    }
+
 }

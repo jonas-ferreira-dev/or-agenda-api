@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\ProfessionalProfileController;
 use App\Http\Controllers\Api\PublicBookingController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\PlatformUserController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -17,8 +18,7 @@ Route::get('/health', function () {
     ]);
 });
 
-Route::post('/register', [AuthController::class, 'register'])
-    ->middleware('throttle:5,1');
+
 
 Route::post('/login', [AuthController::class, 'login'])
     ->middleware('throttle:5,1');
@@ -49,6 +49,11 @@ Route::prefix('public')->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware('platform.admin')->group(function () {
+         Route::get('/platform/users', [PlatformUserController::class, 'index']);
+         Route::post('/platform/users', [PlatformUserController::class, 'store']);
+         Route::put('/platform/users/{user}', [PlatformUserController::class, 'update']);
+    });
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::get('/me', [MeController::class, 'show']);

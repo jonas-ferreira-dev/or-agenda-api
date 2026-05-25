@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use App\Http\Middleware\EnsureUserIsPlatformAdmin;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -16,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(function (Request $request) {
             return null;
         });
+
+        $middleware->alias([
+            'platform.admin' => EnsureUserIsPlatformAdmin::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

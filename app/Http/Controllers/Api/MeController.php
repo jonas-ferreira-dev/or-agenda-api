@@ -8,13 +8,21 @@ use App\Http\Requests\Auth\UpdateProfileRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Http\Request;
 
 class MeController extends Controller
 {
-    public function show(): JsonResponse
+        public function show(Request $request): JsonResponse
     {
+        $user = $request->user();
+
         return response()->json([
-            'user' => request()->user(),
+            'data' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'is_platform_admin' => $user->is_platform_admin,
+            ],
         ]);
     }
 

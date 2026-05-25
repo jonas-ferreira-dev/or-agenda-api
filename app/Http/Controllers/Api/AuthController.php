@@ -38,6 +38,12 @@ class AuthController extends Controller
             ], 422);
         }
 
+        if (! $user->is_active) {
+            return response()->json([
+                'message' => 'Usuário bloqueado. Entre em contato com o suporte.',
+            ], 403);
+        }
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([

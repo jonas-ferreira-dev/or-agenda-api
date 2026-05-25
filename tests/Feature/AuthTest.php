@@ -5,15 +5,14 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
-
-
 
 class AuthTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_user_can_register(): void
+    public function test_public_register_route_is_disabled(): void
     {
         $response = $this->postJson('/api/register', [
             'name' => 'Jonas Ferreira',
@@ -22,40 +21,18 @@ class AuthTest extends TestCase
             'password_confirmation' => 'password123',
         ]);
 
-        $response
-            ->assertCreated()
-            ->assertJsonStructure([
-                'message',
-                'token',
-                'user' => ['id', 'name', 'email'],
-            ]);
+        $response->assertNotFound();
 
-        $this->assertDatabaseHas('users', [
+        $this->assertDatabaseMissing('users', [
             'email' => 'jonas@example.com',
-            'name' => 'Jonas Ferreira',
         ]);
-    }
-
-    public function test_password_is_hashed_when_user_registers(): void
-    {
-        $this->postJson('/api/register', [
-            'name' => 'Jonas Ferreira',
-            'email' => 'jonas@example.com',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-        ]);
-
-        $user = User::where('email', 'jonas@example.com')->first();
-
-        $this->assertNotNull($user);
-        $this->assertTrue(Hash::check('password123', $user->password));
     }
 
     public function test_user_can_login(): void
     {
-        $user = User::factory()->create([
+        User::factory()->create([
             'email' => 'jonas@example.com',
-            'password' => 'password123',
+            'password' => Hash::make('password123'),
         ]);
 
         $response = $this->postJson('/api/login', [
@@ -76,7 +53,7 @@ class AuthTest extends TestCase
     {
         User::factory()->create([
             'email' => 'jonas@example.com',
-            'password' => 'password123',
+            'password' => Hash::make('password123'),
         ]);
 
         $response = $this->postJson('/api/login', [
@@ -93,15 +70,21 @@ class AuthTest extends TestCase
 
     public function test_authenticated_user_can_fetch_profile(): void
     {
-        
-        /** @var User $user */
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user, 'sanctum')->getJson('/api/me');
+        Sanctum::actingAs($user);
+
+        $response = $this->getJson('/api/me');
 
         $response
             ->assertOk()
-            ->assertJsonPath('user.id', $user->id);
+            ->assertJson([
+                'data' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ],
+            ]);
     }
 
     public function test_guest_cannot_access_profile(): void
@@ -110,6 +93,4 @@ class AuthTest extends TestCase
 
         $response->assertUnauthorized();
     }
-
-   
 }

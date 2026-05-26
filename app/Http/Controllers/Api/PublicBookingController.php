@@ -11,6 +11,10 @@ use App\Models\Service;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Services\PublicAvailableSlotsService;
+use App\Models\ProfessionalAvailability;
+use App\Mail\NewPublicAppointmentMail;
+use Illuminate\Support\Facades\Mail;
 
 class PublicBookingController extends Controller
 {
@@ -21,6 +25,14 @@ class PublicBookingController extends Controller
             ->where('is_public', true)
             ->firstOrFail();
 
+        $availableWeekdays = ProfessionalAvailability::query()
+            ->where('user_id', $profile->user_id)
+            ->where('is_active', true)
+            ->distinct()
+            ->orderBy('weekday')
+            ->pluck('weekday')
+            ->values();
+
         return response()->json([
             'message' => 'Perfil público encontrado com sucesso.',
             'data' => [
@@ -29,6 +41,7 @@ class PublicBookingController extends Controller
                 'bio' => $profile->bio,
                 'profile_photo' => $profile->profile_photo,
                 'booking_enabled' => (bool) $profile->booking_enabled,
+                'available_weekdays' => $availableWeekdays,
             ],
         ]);
     }
@@ -54,8 +67,11 @@ class PublicBookingController extends Controller
         ]);
     }
 
-    public function availability(Request $request, string $slug): JsonResponse
-    {
+    public function availability(
+        Request $request,
+        string $slug,
+        PublicAvailableSlotsService $availableSlotsService
+    ): JsonResponse {
         $validated = $request->validate([
             'date' => ['required', 'date', 'after_or_equal:today'],
             'service_id' => ['required', 'integer'],
@@ -67,18 +83,10 @@ class PublicBookingController extends Controller
             ->where('active', true)
             ->findOrFail($validated['service_id']);
 
-        $busyAppointments = Appointment::where('user_id', $profile->user_id)
-            ->whereDate('appointment_date', $validated['date'])
-            ->whereNotIn('status', ['cancelled'])
-            ->orderBy('start_time')
-            ->get(['start_time', 'end_time']);
-
-        $availableSlots = $this->generateAvailableSlots(
-            serviceDuration: $service->duration_minutes,
-            busyAppointments: $busyAppointments->toArray(),
-            startOfDay: '09:00',
-            endOfDay: '18:00',
-            slotStepMinutes: 30
+        $slots = $availableSlotsService->getAvailableSlots(
+            professional: $profile->user,
+            service: $service,
+            date: $validated['date'],
         );
 
         return response()->json([
@@ -87,13 +95,16 @@ class PublicBookingController extends Controller
                 'date' => $validated['date'],
                 'service_id' => $service->id,
                 'duration_minutes' => $service->duration_minutes,
-                'available_slots' => $availableSlots,
+                'available_slots' => $slots,
             ],
         ]);
     }
 
-    public function store(StorePublicAppointmentRequest $request, string $slug): JsonResponse
-    {
+     public function store(
+        StorePublicAppointmentRequest $request,
+        string $slug,
+        PublicAvailableSlotsService $availableSlotsService
+    ): JsonResponse {
         $validated = $request->validated();
 
         $profile = $this->findBookableProfile($slug);
@@ -102,7 +113,27 @@ class PublicBookingController extends Controller
             ->where('active', true)
             ->findOrFail($validated['service_id']);
 
-        $endTime = $this->calculateEndTime($validated['start_time'], $service->duration_minutes);
+        $availableSlots = $availableSlotsService->getAvailableSlots(
+            professional: $profile->user,
+            service: $service,
+            date: $validated['appointment_date'],
+        );
+
+        $selectedSlot = collect($availableSlots)->firstWhere(
+            'start_time',
+            $validated['start_time']
+        );
+
+        if (! $selectedSlot) {
+            return response()->json([
+                'message' => 'Horário indisponível para agendamento.',
+                'errors' => [
+                    'start_time' => ['Horário indisponível para agendamento.'],
+                ],
+            ], 422);
+        }
+
+        $endTime = $selectedSlot['end_time'];
 
         $hasConflict = Appointment::where('user_id', $profile->user_id)
             ->whereDate('appointment_date', $validated['appointment_date'])
@@ -130,7 +161,11 @@ class PublicBookingController extends Controller
             'end_time' => $endTime,
             'status' => 'scheduled',
             'notes' => $validated['notes'] ?? null,
-        ]);
+        ])->load(['client', 'service']);
+
+        Mail::to($profile->user->email)->send(
+            new NewPublicAppointmentMail($appointment)
+        );
 
         return response()->json([
             'message' => 'Agendamento público criado com sucesso.',
@@ -156,7 +191,8 @@ class PublicBookingController extends Controller
 
     private function findBookableProfile(string $slug): ProfessionalProfile
     {
-        return ProfessionalProfile::where('slug', $slug)
+         return ProfessionalProfile::with('user')
+            ->where('slug', $slug)
             ->where('is_public', true)
             ->where('booking_enabled', true)
             ->firstOrFail();
@@ -193,41 +229,7 @@ class PublicBookingController extends Controller
         ]);
     }
 
-    private function calculateEndTime(string $startTime, int $durationMinutes): string
-    {
-        return Carbon::createFromFormat('H:i', $startTime)
-            ->addMinutes($durationMinutes)
-            ->format('H:i:s');
-    }
+    
 
-    private function generateAvailableSlots(
-        int $serviceDuration,
-        array $busyAppointments,
-        string $startOfDay = '09:00',
-        string $endOfDay = '18:00',
-        int $slotStepMinutes = 30
-    ): array {
-        $slots = [];
-
-        $cursor = Carbon::createFromFormat('H:i', $startOfDay);
-        $dayEnd = Carbon::createFromFormat('H:i', $endOfDay);
-
-        while ($cursor->copy()->addMinutes($serviceDuration) <= $dayEnd) {
-            $slotStart = $cursor->format('H:i:s');
-            $slotEnd = $cursor->copy()->addMinutes($serviceDuration)->format('H:i:s');
-
-            $hasConflict = collect($busyAppointments)->contains(function ($appointment) use ($slotStart, $slotEnd) {
-                return $appointment['start_time'] < $slotEnd
-                    && $appointment['end_time'] > $slotStart;
-            });
-
-            if (! $hasConflict) {
-                $slots[] = $cursor->format('H:i');
-            }
-
-            $cursor->addMinutes($slotStepMinutes);
-        }
-
-        return $slots;
-    }
+    
 }

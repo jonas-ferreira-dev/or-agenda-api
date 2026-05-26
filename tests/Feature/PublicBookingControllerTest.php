@@ -9,6 +9,7 @@ use App\Models\Service;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+use App\Models\ProfessionalAvailability;
 
 class PublicBookingControllerTest extends TestCase
 {
@@ -72,6 +73,14 @@ class PublicBookingControllerTest extends TestCase
             'duration_minutes' => 60,
         ]);
 
+        ProfessionalAvailability::factory()->create([
+            'user_id' => $user->id,
+            'weekday' => 5,
+            'start_time' => '10:00',
+            'end_time' => '12:00',
+            'is_active' => true,
+        ]);
+
         $response = $this->postJson('/api/public/professionals/joao-barber/appointments', [
             'name' => 'Maria Silva',
             'email' => 'maria@example.com',
@@ -133,6 +142,14 @@ class PublicBookingControllerTest extends TestCase
             'phone' => '11999999999',
         ]);
 
+        ProfessionalAvailability::factory()->create([
+            'user_id' => $user->id,
+            'weekday' => 5,
+            'start_time' => '12:00',
+            'end_time' => '14:00',
+            'is_active' => true,
+        ]);
+
         $response = $this->postJson('/api/public/professionals/joao-barber/appointments', [
             'name' => 'Maria Nova',
             'email' => 'maria@example.com',
@@ -184,6 +201,14 @@ class PublicBookingControllerTest extends TestCase
             'end_time' => '11:00',
         ]);
 
+        ProfessionalAvailability::factory()->create([
+            'user_id' => $user->id,
+            'weekday' => 5,
+            'start_time' => '10:00',
+            'end_time' => '12:00',
+            'is_active' => true,
+        ]);
+
         $response = $this->postJson('/api/public/professionals/joao-barber/appointments', [
             'name' => 'Outra Cliente',
             'email' => 'outra@example.com',
@@ -195,9 +220,9 @@ class PublicBookingControllerTest extends TestCase
         ]);
 
         $response->assertStatus(422)
-            ->assertJsonFragment([
-                'message' => 'Já existe um agendamento nesse intervalo.',
-            ]);
+        ->assertJsonFragment([
+            'message' => 'Horário indisponível para agendamento.',
+        ]);
     }
 
     public function test_cannot_create_public_appointment_if_booking_is_disabled(): void

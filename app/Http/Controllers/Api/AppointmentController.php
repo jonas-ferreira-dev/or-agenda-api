@@ -168,6 +168,35 @@ class AppointmentController extends Controller
         ]);
     }
 
+        public function cancel(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'cancellation_reason' => ['required', 'string', 'min:3', 'max:1000'],
+        ]);
+
+        $appointment = Appointment::where('user_id', $request->user()->id)
+            ->with(['client', 'service'])
+            ->findOrFail($id);
+
+        if ($appointment->status === 'cancelled') {
+            return response()->json([
+                'message' => 'Este agendamento já está cancelado.',
+            ], 422);
+        }
+
+        $appointment->update([
+            'status' => 'cancelled',
+            'cancellation_reason' => $validated['cancellation_reason'],
+            'cancelled_at' => now(),
+            'cancelled_by' => 'professional',
+        ]);
+
+        return response()->json([
+            'message' => 'Agendamento cancelado com sucesso.',
+            'data' => $appointment->fresh()->load(['client', 'service']),
+        ]);
+    }
+
     public function destroy(Request $request, int $id): JsonResponse
     {
         $appointment = Appointment::where('user_id', $request->user()->id)->findOrFail($id);

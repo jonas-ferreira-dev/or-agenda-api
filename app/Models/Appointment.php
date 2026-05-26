@@ -15,6 +15,9 @@ class Appointment extends Model
         'client_id',
         'service_id',
         'appointment_date',
+        'cancellation_reason',
+        'cancelled_at',
+        'cancelled_by',
         'start_time',
         'end_time',
         'status',
@@ -23,6 +26,7 @@ class Appointment extends Model
 
     protected $casts = [
         'appointment_date' => 'date',
+        'cancelled_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

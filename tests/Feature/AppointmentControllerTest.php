@@ -195,4 +195,155 @@ class AppointmentControllerTest extends TestCase
             'id' => $appointment->id,
         ]);
     }
+
+        public function test_user_can_cancel_own_appointment_with_reason(): void
+    {
+        $user = User::factory()->create();
+
+        $client = Client::factory()->create([
+            'user_id' => $user->id,
+        ]);
+
+        $service = Service::factory()->create([
+            'user_id' => $user->id,
+        ]);
+
+        $appointment = Appointment::factory()->create([
+            'user_id' => $user->id,
+            'client_id' => $client->id,
+            'service_id' => $service->id,
+            'status' => 'scheduled',
+            'appointment_date' => '2026-05-25',
+            'start_time' => '10:00',
+            'end_time' => '11:00',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->patchJson("/api/appointments/{$appointment->id}/cancel", [
+            'cancellation_reason' => 'Profissional indisponível neste horário.',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJson([
+                'message' => 'Agendamento cancelado com sucesso.',
+                'data' => [
+                    'id' => $appointment->id,
+                    'status' => 'cancelled',
+                    'cancellation_reason' => 'Profissional indisponível neste horário.',
+                    'cancelled_by' => 'professional',
+                ],
+            ]);
+
+        $this->assertDatabaseHas('appointments', [
+            'id' => $appointment->id,
+            'status' => 'cancelled',
+            'cancellation_reason' => 'Profissional indisponível neste horário.',
+            'cancelled_by' => 'professional',
+        ]);
+
+        $this->assertNotNull(
+            Appointment::find($appointment->id)->cancelled_at
+        );
+    }
+
+    public function test_user_cannot_cancel_other_users_appointment(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        $client = Client::factory()->create([
+            'user_id' => $otherUser->id,
+        ]);
+
+        $service = Service::factory()->create([
+            'user_id' => $otherUser->id,
+        ]);
+
+        $appointment = Appointment::factory()->create([
+            'user_id' => $otherUser->id,
+            'client_id' => $client->id,
+            'service_id' => $service->id,
+            'status' => 'scheduled',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->patchJson("/api/appointments/{$appointment->id}/cancel", [
+            'cancellation_reason' => 'Teste de cancelamento.',
+        ]);
+
+        $response->assertNotFound();
+
+        $this->assertDatabaseHas('appointments', [
+            'id' => $appointment->id,
+            'status' => 'scheduled',
+        ]);
+    }
+
+    public function test_cancel_appointment_requires_reason(): void
+    {
+        $user = User::factory()->create();
+
+        $client = Client::factory()->create([
+            'user_id' => $user->id,
+        ]);
+
+        $service = Service::factory()->create([
+            'user_id' => $user->id,
+        ]);
+
+        $appointment = Appointment::factory()->create([
+            'user_id' => $user->id,
+            'client_id' => $client->id,
+            'service_id' => $service->id,
+            'status' => 'scheduled',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->patchJson("/api/appointments/{$appointment->id}/cancel", [
+            'cancellation_reason' => '',
+        ]);
+
+        $response
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['cancellation_reason']);
+    }
+
+    public function test_user_cannot_cancel_already_cancelled_appointment(): void
+    {
+        $user = User::factory()->create();
+
+        $client = Client::factory()->create([
+            'user_id' => $user->id,
+        ]);
+
+        $service = Service::factory()->create([
+            'user_id' => $user->id,
+        ]);
+
+        $appointment = Appointment::factory()->create([
+            'user_id' => $user->id,
+            'client_id' => $client->id,
+            'service_id' => $service->id,
+            'status' => 'cancelled',
+            'cancellation_reason' => 'Cancelado anteriormente.',
+            'cancelled_at' => now(),
+            'cancelled_by' => 'professional',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->patchJson("/api/appointments/{$appointment->id}/cancel", [
+            'cancellation_reason' => 'Tentando cancelar novamente.',
+        ]);
+
+        $response
+            ->assertUnprocessable()
+            ->assertJson([
+                'message' => 'Este agendamento já está cancelado.',
+            ]);
+    }
 }

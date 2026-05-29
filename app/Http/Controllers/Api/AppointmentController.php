@@ -168,6 +168,34 @@ class AppointmentController extends Controller
         ]);
     }
 
+        public function complete(Request $request, int $id): JsonResponse
+    {
+        $appointment = Appointment::where('user_id', $request->user()->id)
+            ->with(['client', 'service'])
+            ->findOrFail($id);
+
+        if ($appointment->status === 'completed') {
+            return response()->json([
+                'message' => 'Este agendamento já está concluído.',
+            ], 422);
+        }
+
+        if ($appointment->status === 'cancelled') {
+            return response()->json([
+                'message' => 'Não é possível concluir um agendamento cancelado.',
+            ], 422);
+        }
+
+        $appointment->update([
+            'status' => 'completed',
+        ]);
+
+        return response()->json([
+            'message' => 'Agendamento concluído com sucesso.',
+            'data' => $appointment->fresh()->load(['client', 'service']),
+        ]);
+    }
+
         public function cancel(Request $request, int $id): JsonResponse
     {
         $validated = $request->validate([
